@@ -1,0 +1,1353 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+
+    <meta charset="UTF-8">
+
+    <meta name="viewport"
+          content="width=device-width, initial-scale=1.0">
+
+    <title>Escape Room GM Control Center</title>
+
+    <!-- Served from the Pi so it works with no internet -->
+    <script src="{{ url_for('static', filename='socket.io.min.js') }}"></script>
+
+    <style>
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: Arial, sans-serif;
+            background: #101010;
+            color: white;
+            margin: 0;
+            padding: 20px;
+        }
+
+        h1 {
+            text-align: center;
+            margin-bottom: 25px;
+        }
+
+        /* 
+           ROOM STATUS BAR
+            */
+
+        .status-panel {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 10px;
+            background: #1c1c1c;
+            padding: 15px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+        }
+
+        .status-room {
+            background: #292929;
+            padding: 12px;
+            border-radius: 8px;
+            text-align: center;
+        }
+
+        .status-room-name {
+            font-weight: bold;
+            margin-bottom: 8px;
+        }
+
+        .online {
+            color: #35e06f;
+        }
+
+        .offline {
+            color: #ff4444;
+        }
+
+        /* 
+           TABS
+            */
+
+        .tab-buttons {
+            display: flex;
+            justify-content: center;
+            gap: 8px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+
+        .tab-btn {
+            padding: 12px 20px;
+            background: #333;
+            color: white;
+            border: none;
+            cursor: pointer;
+            border-radius: 6px;
+            font-size: 15px;
+        }
+
+        .tab-btn:hover {
+            background: #444;
+        }
+
+        .tab-btn.active {
+            background: #0066cc;
+        }
+
+        /* 
+           ROOM CONTENT
+            */
+
+        .room-content {
+            display: none;
+            background: #1c1c1c;
+            padding: 25px;
+            border-radius: 10px;
+            max-width: 900px;
+            margin: auto;
+        }
+
+        .room-content.active {
+            display: block;
+        }
+
+        .room-title {
+            text-align: center;
+            margin-top: 0;
+        }
+
+        /* 
+           DEVICE STATUS
+            */
+
+        .device-status {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-bottom: 25px;
+        }
+
+        .device {
+            background: #292929;
+            padding: 15px;
+            border-radius: 8px;
+        }
+
+        .device-status-light {
+            font-weight: bold;
+        }
+
+        /* 
+           PHASE
+            */
+
+        .phase-box {
+            background: #111;
+            border-left: 5px solid #007bff;
+            padding: 15px;
+            margin-bottom: 25px;
+            border-radius: 5px;
+        }
+
+        .phase-title {
+            color: #55aaff;
+            font-size: 13px;
+            text-transform: uppercase;
+        }
+
+        .phase {
+            font-size: 22px;
+            font-weight: bold;
+            margin-top: 5px;
+        }
+
+        .phase-details {
+            color: #bbb;
+            margin-top: 8px;
+        }
+
+        /* 
+           WORKFLOW
+            */
+
+        .workflow {
+            margin-bottom: 25px;
+        }
+
+        .workflow-step {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            background: #292929;
+            padding: 12px;
+            margin: 6px 0;
+            border-radius: 5px;
+        }
+
+        .step-number {
+            background: #555;
+            min-width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+        }
+
+        .step-gm {
+            border-left: 4px solid #ffc107;
+        }
+
+        .step-plc {
+            border-left: 4px solid #17a2b8;
+        }
+
+        .step-player {
+            border-left: 4px solid #6f42c1;
+        }
+
+        /* 
+           BUTTONS
+            */
+
+        .control-btn {
+            display: block;
+            width: 100%;
+            padding: 15px;
+            margin: 10px 0;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: bold;
+            color: white;
+            background: #198754;
+        }
+
+        .control-btn:hover {
+            background: #157347;
+        }
+
+        .warning-btn {
+            background: #d39e00;
+            color: black;
+        }
+
+        .warning-btn:hover {
+            background: #b88600;
+        }
+
+        .danger-btn {
+            background: #dc3545;
+        }
+
+        .danger-btn:hover {
+            background: #bb2d3b;
+        }
+
+        .blue-btn {
+            background: #0069d9;
+        }
+
+        .blue-btn:hover {
+            background: #0056b3;
+        }
+
+        .reset-btn {
+            background: #6c757d;
+        }
+
+        .reset-btn:hover {
+            background: #5a6268;
+        }
+
+        .section-title {
+            border-bottom: 1px solid #444;
+            padding-bottom: 8px;
+            margin-top: 25px;
+        }
+
+        /* 
+           BROKER BADGE + TOAST + ACTIVE STEP
+            */
+
+        #broker-badge {
+            position: fixed;
+            top: 10px;
+            right: 10px;
+            padding: 6px 12px;
+            border-radius: 6px;
+            font-size: 13px;
+            font-weight: bold;
+            background: #dc3545;
+            z-index: 10;
+        }
+
+        #broker-badge.ok {
+            background: #198754;
+        }
+
+        #toast {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            padding: 12px 20px;
+            border-radius: 6px;
+            font-weight: bold;
+            display: none;
+            z-index: 10;
+        }
+
+        #toast.ok {
+            background: #198754;
+        }
+
+        #toast.bad {
+            background: #dc3545;
+        }
+
+        .workflow-step.active {
+            background: #0d3b66;
+            outline: 2px solid #55aaff;
+        }
+
+        .workflow-step.active .step-number {
+            background: #55aaff;
+            color: black;
+        }
+
+        /* 
+           RESPONSIVE
+            */
+
+        @media (max-width: 800px) {
+
+            .status-panel {
+                grid-template-columns: 1fr 1fr;
+            }
+
+            .device-status {
+                grid-template-columns: 1fr;
+            }
+        }
+
+    </style>
+
+</head>
+
+<body>
+
+<h1>ESCAPE ROOM GM CONTROL CENTER</h1>
+
+<div id="broker-badge">SERVER: CONNECTING</div>
+<div id="toast"></div>
+
+
+<!-- 
+     GLOBAL ROOM STATUS
+      -->
+
+<div class="status-panel">
+
+    <div class="status-room">
+
+        <div class="status-room-name">
+            Maintenance Room
+        </div>
+
+        <div>
+            Ronnie ESP32:
+            <span id="room1-controller" class="offline">OFFLINE</span>
+        </div>
+
+        <div>
+            PLC:
+            <span id="room1-plc" class="offline">OFFLINE</span>
+        </div>
+
+    </div>
+
+
+    <div class="status-room">
+
+        <div class="status-room-name">
+            Tron Room
+        </div>
+
+        <div>
+            Controller:
+            <span id="room2-controller" class="offline">OFFLINE</span>
+        </div>
+
+        <div>
+            PLC:
+            <span id="room2-plc" class="offline">OFFLINE</span>
+        </div>
+
+    </div>
+
+
+    <div class="status-room">
+
+        <div class="status-room-name">
+            Temple Room
+        </div>
+
+        <div>
+            Winston ESP32:
+            <span id="room3-controller" class="offline">OFFLINE</span>
+        </div>
+
+        <div>
+            PLC:
+            <span id="room3-plc" class="offline">OFFLINE</span>
+        </div>
+
+    </div>
+
+
+    <div class="status-room">
+
+        <div class="status-room-name">
+            Haunted House Room
+        </div>
+
+        <div>
+            Demogorgon ESP32:
+            <span id="room4-controller" class="offline">OFFLINE</span>
+        </div>
+
+        <div>
+            PLC:
+            <span id="room4-plc" class="offline">OFFLINE</span>
+        </div>
+
+    </div>
+
+</div>
+
+
+<!-- 
+     ROOM TABS
+      -->
+
+<div class="tab-buttons">
+
+    <button class="tab-btn active"
+            onclick="openRoom(event, 'Room1')">
+        Maintenance Room
+    </button>
+
+    <button class="tab-btn"
+            onclick="openRoom(event, 'Room2')">
+        Tron Room
+    </button>
+
+    <button class="tab-btn"
+            onclick="openRoom(event, 'Room3')">
+        Temple Room
+    </button>
+
+    <button class="tab-btn"
+            onclick="openRoom(event, 'Room4')">
+        Haunted House Room
+    </button>
+
+</div>
+
+
+<!-- 
+     MAINTENANCE ROOM
+      -->
+
+<div id="Room1" class="room-content active">
+
+    <h2 class="room-title">
+        Maintenance Room
+    </h2>
+
+
+    <div class="device-status">
+
+        <div class="device">
+            Ronnie ESP32:
+            <span id="device-room1-controller"
+                  class="device-status-light offline">
+                OFFLINE
+            </span>
+        </div>
+
+        <div class="device">
+            Maintenance PLC:
+            <span id="device-room1-plc"
+                  class="device-status-light offline">
+                OFFLINE
+            </span>
+        </div>
+
+    </div>
+
+
+    <div class="phase-box">
+
+        <div class="phase-title">
+            Current Phase
+        </div>
+
+        <div id="phase-room1"
+             class="phase">
+            Waiting
+        </div>
+
+        <div id="details-room1"
+             class="phase-details">
+            Waiting for game to begin.
+        </div>
+
+    </div>
+
+
+    <h3 class="section-title">
+        Workflow
+    </h3>
+
+
+    <div class="workflow">
+
+        <div class="workflow-step step-gm">
+            <div class="step-number">1</div>
+            <div>
+                <strong>GM:</strong>
+                Power on Ronnie
+            </div>
+        </div>
+
+        <div class="workflow-step step-player">
+            <div class="step-number">2</div>
+            <div>
+                <strong>Players:</strong>
+                Camera Puzzle
+            </div>
+        </div>
+
+        <div class="workflow-step step-gm">
+            <div class="step-number">3</div>
+            <div>
+                <strong>GM:</strong>
+                Show Toggle
+            </div>
+        </div>
+
+        <div class="workflow-step step-gm">
+            <div class="step-number">4</div>
+            <div>
+                <strong>GM:</strong>
+                Tim's Show
+            </div>
+        </div>
+
+        <div class="workflow-step step-gm">
+            <div class="step-number">5</div>
+            <div>
+                <strong>GM:</strong>
+                Audio Toggle
+            </div>
+        </div>
+
+        <div class="workflow-step step-player">
+            <div class="step-number">6</div>
+            <div>
+                <strong>Curator:</strong>
+                Pull Door
+            </div>
+        </div>
+
+    </div>
+
+
+    <h3 class="section-title">
+        GM Controls
+    </h3>
+
+
+    <button class="control-btn blue-btn"
+            onclick="sendAction('Room 1', 'ronnie_power_on')">
+        POWER ON RONNIE
+    </button>
+
+
+    <button class="control-btn"
+            onclick="sendAction('Room 1', 'show_toggle')">
+        SHOW TOGGLE — CHANGE ROOM LIGHTING
+    </button>
+
+    <button class="control-btn"
+            onclick="sendAction('Room 1', 'phone_toggle')">
+        AUDIO TOGGLE — PHONE
+    </button>
+
+    <button class="control-btn"
+            onclick="sendAction('Room 1', 'audio_toggle')">
+        AUDIO TOGGLE — AUDIO ALARM
+    </button>
+
+
+    <button class="control-btn warning-btn"
+            onclick="sendAction('Room 1', 'tim_show')">
+        TIM'S SHOW — PROJECTOR
+    </button>
+
+
+    <button class="control-btn reset-btn"
+            onclick="resetRoom('Room 1')">
+        RESET MAINTENANCE ROOM
+    </button>
+
+</div>
+
+
+<!-- 
+     TRON ROOM
+      -->
+
+<div id="Room2" class="room-content">
+
+    <h2 class="room-title">
+        Tron Room
+    </h2>
+
+
+    <div class="device-status">
+
+        <div class="device">
+            Tron Controller:
+            <span id="device-room2-controller"
+                  class="device-status-light offline">
+                OFFLINE
+            </span>
+        </div>
+
+        <div class="device">
+            Tron PLC:
+            <span id="device-room2-plc"
+                  class="device-status-light offline">
+                OFFLINE
+            </span>
+        </div>
+
+    </div>
+
+
+    <div class="phase-box">
+
+        <div class="phase-title">
+            Current Phase
+        </div>
+
+        <div id="phase-room2"
+             class="phase">
+            Waiting
+        </div>
+
+        <div id="details-room2"
+             class="phase-details">
+            Waiting for game to begin.
+        </div>
+
+    </div>
+
+
+    <h3 class="section-title">
+        Workflow
+    </h3>
+
+
+    <div class="workflow">
+
+        <div class="workflow-step step-player">
+            <div class="step-number">1</div>
+            <div>
+                <strong>Players:</strong>
+                Tron Puzzle
+            </div>
+        </div>
+
+        <div class="workflow-step step-gm">
+            <div class="step-number">2</div>
+            <div>
+                <strong>GM:</strong>
+                Voice From Above 1
+            </div>
+        </div>
+
+        <div class="workflow-step step-player">
+            <div class="step-number">3</div>
+            <div>
+                <strong>Players:</strong>
+                Complete Puzzle
+            </div>
+        </div>
+
+        <div class="workflow-step step-gm">
+            <div class="step-number">4</div>
+            <div>
+                <strong>GM:</strong>
+                Voice From Above 2
+            </div>
+        </div>
+
+        <div class="workflow-step step-player">
+            <div class="step-number">5</div>
+            <div>
+                <strong>Curator:</strong>
+                Leads Players to Temple
+            </div>
+        </div>
+
+    </div>
+
+
+    <h3 class="section-title">
+        GM Controls
+    </h3>
+
+
+    <button class="control-btn blue-btn"
+            onclick="sendAction('Room 2', 'voice_above_1')">
+        VOICE FROM ABOVE 1
+    </button>
+
+
+    <button class="control-btn blue-btn"
+            onclick="sendAction('Room 2', 'voice_above_2')">
+        VOICE FROM ABOVE 2
+    </button>
+
+
+    <button class="control-btn reset-btn"
+            onclick="resetRoom('Room 2')">
+        RESET TRON ROOM
+    </button>
+
+</div>
+
+
+<!-- 
+     TEMPLE ROOM
+      -->
+
+<div id="Room3" class="room-content">
+
+    <h2 class="room-title">
+        Temple Room
+    </h2>
+
+
+    <div class="device-status">
+
+        <div class="device">
+            Winston ESP32:
+            <span id="device-room3-controller"
+                  class="device-status-light offline">
+                OFFLINE
+            </span>
+        </div>
+
+        <div class="device">
+            Temple PLC:
+            <span id="device-room3-plc"
+                  class="device-status-light offline">
+                OFFLINE
+            </span>
+        </div>
+
+    </div>
+
+
+    <div class="phase-box">
+
+        <div class="phase-title">
+            Current Phase
+        </div>
+
+        <div id="phase-room3"
+             class="phase">
+            Waiting
+        </div>
+
+        <div id="details-room3"
+             class="phase-details">
+            Waiting for game to begin.
+        </div>
+
+    </div>
+
+
+    <h3 class="section-title">
+        Automatic PLC Workflow
+    </h3>
+
+
+    <div class="workflow">
+
+        <div class="workflow-step step-player">
+            <div class="step-number">1</div>
+            <div>
+                Tile Puzzle
+            </div>
+        </div>
+
+        <div class="workflow-step step-plc">
+            <div class="step-number">2</div>
+            <div>
+                PLC listens for Holy Grail input
+            </div>
+        </div>
+
+        <div class="workflow-step step-plc">
+            <div class="step-number">3</div>
+            <div>
+                Correct tile → clicking audio
+            </div>
+        </div>
+
+        <div class="workflow-step step-plc">
+            <div class="step-number">4</div>
+            <div>
+                Incorrect tile → disruptive noise + red lights
+            </div>
+        </div>
+
+        <div class="workflow-step step-player">
+            <div class="step-number">5</div>
+            <div>
+                Monkey Puzzle
+            </div>
+        </div>
+
+        <div class="workflow-step step-plc">
+            <div class="step-number">6</div>
+            <div>
+                Idol stand
+            </div>
+        </div>
+
+        <div class="workflow-step step-plc">
+            <div class="step-number">7</div>
+            <div>
+                Door sensor → victory theme
+            </div>
+        </div>
+
+    </div>
+
+
+    <h3 class="section-title">
+        GM Controls
+    </h3>
+
+
+    <button class="control-btn blue-btn"
+            onclick="sendAction('Room 3', 'tail_animation')">
+        START TAIL ANIMATION
+    </button>
+
+
+    <button class="control-btn warning-btn"
+            onclick="sendAction('Room 3', 'temple_door')">
+        OPEN TEMPLE DOOR / VICTORY
+    </button>
+
+
+    <button class="control-btn reset-btn"
+            onclick="resetRoom('Room 3')">
+        RESET TEMPLE ROOM
+    </button>
+
+</div>
+
+
+<!-- 
+     HAUNTED HOUSE
+      -->
+
+<div id="Room4" class="room-content">
+
+    <h2 class="room-title">
+        Haunted House Room
+    </h2>
+
+
+    <div class="device-status">
+
+        <div class="device">
+            Demogorgon ESP32:
+            <span id="device-room4-controller"
+                  class="device-status-light offline">
+                OFFLINE
+            </span>
+        </div>
+
+        <div class="device">
+            Haunted House PLC:
+            <span id="device-room4-plc"
+                  class="device-status-light offline">
+                OFFLINE
+            </span>
+        </div>
+
+    </div>
+
+
+    <div class="phase-box">
+
+        <div class="phase-title">
+            Current Phase
+        </div>
+
+        <div id="phase-room4"
+             class="phase">
+            Waiting
+        </div>
+
+        <div id="details-room4"
+             class="phase-details">
+            Waiting for game to begin.
+        </div>
+
+    </div>
+
+
+    <h3 class="section-title">
+        Workflow
+    </h3>
+
+
+    <div class="workflow">
+
+        <div class="workflow-step step-plc">
+            <div class="step-number">1</div>
+            <div>
+                ABC wall + strobe + clawing/bang audio
+            </div>
+        </div>
+
+        <div class="workflow-step step-gm">
+            <div class="step-number">2</div>
+            <div>
+                <strong>GM:</strong>
+                Demogorgon Show 1
+            </div>
+        </div>
+
+        <div class="workflow-step step-gm">
+            <div class="step-number">3</div>
+            <div>
+                <strong>GM:</strong>
+                Reset Demogorgon
+            </div>
+        </div>
+
+        <div class="workflow-step step-plc">
+            <div class="step-number">4</div>
+            <div>
+                ABC wall - Spirits Awaken
+            </div>
+        </div>
+
+        <div class="workflow-step step-player">
+            <div class="step-number">5</div>
+            <div>
+                D&D Phase 1 — Clock Puzzle
+            </div>
+        </div>
+
+        <div class="workflow-step step-player">
+            <div class="step-number">6</div>
+            <div>
+                D&D Phase 2 — Figurine Box
+            </div>
+        </div>
+
+        <div class="workflow-step step-player">
+            <div class="step-number">7</div>
+            <div>
+                D&D Phase 3 — Board
+            </div>
+        </div>
+
+        <div class="workflow-step step-gm">
+            <div class="step-number">8</div>
+            <div>
+                <strong>GM:</strong>
+                Demogorgon Show 2
+            </div>
+        </div>
+
+        <div class="workflow-step step-gm">
+            <div class="step-number">9</div>
+            <div>
+                <strong>GM:</strong>
+                Reset Button
+            </div>
+        </div>
+
+    </div>
+
+
+    <h3 class="section-title">
+        GM Controls
+    </h3>
+
+
+    <button class="control-btn danger-btn"
+            onclick="sendAction('Room 4', 'demogorgon_show_1')">
+        DEMOGORGON SHOW 1
+    </button>
+
+
+    <button class="control-btn warning-btn"
+            onclick="sendAction('Room 4', 'demogorgon_reset')">
+        RESET DEMOGORGON
+    </button>
+
+
+    <button class="control-btn danger-btn"
+            onclick="sendAction('Room 4', 'demogorgon_show_2')">
+        DEMOGORGON SHOW 2
+    </button>
+
+
+    <button class="control-btn reset-btn"
+            onclick="resetRoom('Room 4')">
+        RESET HAUNTED HOUSE ROOM
+    </button>
+
+</div>
+
+
+<!-- 
+     JAVASCRIPT
+      -->
+
+<script>
+
+    const socket = io({
+        transports: ['polling']
+    });
+
+
+    // 
+    // TAB SWITCHING
+    // 
+
+    function openRoom(evt, roomID) {
+
+        let contents =
+            document.getElementsByClassName("room-content");
+
+        for (let c of contents) {
+            c.classList.remove("active");
+        }
+
+
+        let buttons =
+            document.getElementsByClassName("tab-btn");
+
+        for (let b of buttons) {
+            b.classList.remove("active");
+        }
+
+
+        document.getElementById(roomID)
+            .classList.add("active");
+
+        evt.currentTarget
+            .classList.add("active");
+    }
+
+
+    // 
+    // SEND GM COMMAND
+    // 
+
+    function sendAction(room, action) {
+
+        console.log(
+            "Sending command:",
+            room,
+            action
+        );
+
+
+        if (!socket.connected) {
+            showToast(false, "Not connected to GM server");
+            return;
+        }
+
+        socket.emit(
+            'trigger_action',
+            {
+                room: room,
+                action: action
+            },
+            function(result) {
+                showToast(result.ok, result.msg);
+            }
+        );
+    }
+
+
+    // 
+    // RESET ROOM
+    // 
+
+    function resetRoom(room) {
+
+        const confirmed =
+            confirm(
+                "Are you sure you want to reset " +
+                room + "?"
+            );
+
+
+        if (!confirmed) {
+            return;
+        }
+
+
+        socket.emit(
+            'reset_room',
+            {
+                room: room
+            },
+            function(result) {
+                showToast(result.ok, result.msg);
+            }
+        );
+    }
+
+
+    // 
+    // CONNECTION STATUS
+    // 
+
+    function setStatus(elementID, online) {
+
+        const element =
+            document.getElementById(elementID);
+
+        if (!element) {
+            return;
+        }
+
+
+        element.className =
+            online
+                ? "online"
+                : "offline";
+
+        element.innerText =
+            online
+                ? "ONLINE"
+                : "OFFLINE";
+    }
+
+
+    // 
+    // STATUS UPDATE FROM SERVER
+    // 
+
+    socket.on(
+        'status_update',
+        function(statusMap) {
+
+            for (let room in statusMap) {
+
+                const status =
+                    statusMap[room];
+
+
+                let number =
+                    room.replace("Room ", "");
+
+
+                // Global status
+
+                setStatus(
+                    `room${number}-controller`,
+                    status.controller
+                );
+
+
+                setStatus(
+                    `room${number}-plc`,
+                    status.plc
+                );
+
+
+                // Room device status
+
+                setStatus(
+                    `device-room${number}-controller`,
+                    status.controller
+                );
+
+
+                setStatus(
+                    `device-room${number}-plc`,
+                    status.plc
+                );
+
+
+                // Current phase
+
+                const phaseElement =
+                    document.getElementById(
+                        `phase-room${number}`
+                    );
+
+
+                const detailsElement =
+                    document.getElementById(
+                        `details-room${number}`
+                    );
+
+
+                if (phaseElement) {
+
+                    phaseElement.innerText =
+                        status.phase;
+                }
+
+
+                if (detailsElement) {
+
+                    detailsElement.innerText =
+                        status.details;
+                }
+
+
+                // Highlight current workflow step
+
+                const steps =
+                    document.querySelectorAll(
+                        `#Room${number} .workflow-step`
+                    );
+
+                steps.forEach(function(el, i) {
+                    el.classList.toggle(
+                        "active",
+                        i + 1 === status.step
+                    );
+                });
+
+            }
+
+        }
+    );
+
+
+    // 
+    // SOCKET CONNECTION
+    // 
+
+    // 
+    // SERVER / BROKER STATUS BADGE
+    // 
+
+    let brokerUp = false;
+
+    function setBadge(serverUp) {
+
+        const badge =
+            document.getElementById("broker-badge");
+
+        if (!serverUp) {
+            badge.className = "";
+            badge.innerText = "SERVER: OFFLINE";
+        } else if (!brokerUp) {
+            badge.className = "";
+            badge.innerText = "BROKER: OFFLINE";
+        } else {
+            badge.className = "ok";
+            badge.innerText = "CONNECTED";
+        }
+    }
+
+
+    socket.on(
+        'broker_status',
+        function(data) {
+            brokerUp = data.connected;
+            setBadge(socket.connected);
+        }
+    );
+
+
+    // 
+    // COMMAND RESULT POPUP
+    // 
+
+    let toastTimer;
+
+    function showToast(ok, msg) {
+
+        const t =
+            document.getElementById("toast");
+
+        t.className = ok ? "ok" : "bad";
+        t.innerText = msg;
+        t.style.display = "block";
+
+        clearTimeout(toastTimer);
+
+        toastTimer = setTimeout(function() {
+            t.style.display = "none";
+        }, ok ? 2000 : 5000);
+    }
+
+
+    socket.on(
+        'connect',
+        function() {
+
+            console.log(
+                "GM dashboard connected to server."
+            );
+
+            setBadge(true);
+        }
+    );
+
+
+    socket.on(
+        'disconnect',
+        function() {
+
+            console.log(
+                "GM dashboard disconnected."
+            );
+
+            brokerUp = false;
+            setBadge(false);
+
+            // Nothing is trustworthy while disconnected
+            document
+                .querySelectorAll(".online")
+                .forEach(function(el) {
+                    el.className = "offline";
+                    el.innerText = "OFFLINE";
+                });
+        }
+    );
+
+</script>
+
+</body>
+
+</html>

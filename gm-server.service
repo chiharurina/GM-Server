@@ -1,0 +1,14 @@
+[Unit]
+Description=Retro Rewind GM Server
+After=network-online.target mosquitto.service
+Wants=network-online.target
+
+[Service]
+User=retrorewind
+WorkingDirectory=/home/retrorewind/retrorewind/GM-Server
+ExecStart=/home/retrorewind/retrorewind/GM-Server/venv/bin/python app.py
+Restart=always
+RestartSec=2
+
+[Install]
+WantedBy=multi-user.target
